@@ -59,10 +59,9 @@ def get_categories_content(contents: List[str]) -> Tuple[Categories, CategoriesL
             raw_content.strip() for raw_content in line_content.split('|')[1:-1]
         ][0]
 
-        title_match = link_re.match(raw_title)
-        if title_match:
-                title = title_match.group(1).upper()
-                categories[category].append(title)
+        if title_match := link_re.match(raw_title):
+            title = title_match.group(1).upper()
+            categories[category].append(title)
 
     return (categories, category_line_num)
 
@@ -88,19 +87,16 @@ def check_title(line_num: int, raw_title: str) -> List[str]:
 
     err_msgs = []
 
-    title_match = link_re.match(raw_title)
-
-    # url should be wrapped in "[TITLE](LINK)" Markdown syntax
-    if not title_match:
-        err_msg = error_message(line_num, 'Title syntax should be "[TITLE](LINK)"')
-        err_msgs.append(err_msg)
-    else:
+    if title_match := link_re.match(raw_title):
         # do not allow "... API" in the entry title
         title = title_match.group(1)
         if title.upper().endswith(' API'):
             err_msg = error_message(line_num, 'Title should not end with "... API". Every entry is an API here!')
             err_msgs.append(err_msg)
 
+    else:
+        err_msg = error_message(line_num, 'Title syntax should be "[TITLE](LINK)"')
+        err_msgs.append(err_msg)
     return err_msgs
 
 
@@ -178,15 +174,13 @@ def check_entry(line_num: int, segments: List[str]) -> List[str]:
     https_err_msgs = check_https(line_num, https)
     cors_err_msgs = check_cors(line_num, cors)
 
-    err_msgs = [
+    return [
         *title_err_msgs,
         *desc_err_msgs,
         *auth_err_msgs,
         *https_err_msgs,
-        *cors_err_msgs
+        *cors_err_msgs,
     ]
-
-    return err_msgs
 
 
 def check_file_format(lines: List[str]) -> List[str]:
@@ -203,14 +197,14 @@ def check_file_format(lines: List[str]) -> List[str]:
 
     for line_num, line_content in enumerate(lines):
 
-        category_title_match = category_title_in_index_re.match(line_content)
-        if category_title_match:
+        if category_title_match := category_title_in_index_re.match(
+            line_content
+        ):
             category_title_in_index.append(category_title_match.group(1))
 
         # check each category for the minimum number of entries
         if line_content.startswith(anchor):
-            category_match = anchor_re.match(line_content)
-            if category_match:
+            if category_match := anchor_re.match(line_content):
                 if category_match.group(1) not in category_title_in_index:
                     err_msg = error_message(line_num, f'category header ({category_match.group(1)}) not added to Index section')
                     err_msgs.append(err_msg)
@@ -237,28 +231,26 @@ def check_file_format(lines: List[str]) -> List[str]:
             err_msg = error_message(line_num, f'entry does not have all the required columns (have {len(segments)}, need {num_segments})')
             err_msgs.append(err_msg)
             continue
-    
+
         for segment in segments:
             # every line segment should start and end with exactly 1 space
             if len(segment) - len(segment.lstrip()) != 1 or len(segment) - len(segment.rstrip()) != 1:
                 err_msg = error_message(line_num, 'each segment must start and end with exactly 1 space')
                 err_msgs.append(err_msg)
-        
+
         segments = [segment.strip() for segment in segments]
         entry_err_msgs = check_entry(line_num, segments)
         err_msgs.extend(entry_err_msgs)
-    
+
     return err_msgs
 
 
 def main(filename: str) -> None:
 
     with open(filename, mode='r', encoding='utf-8') as file:
-        lines = list(line.rstrip() for line in file)
+        lines = [line.rstrip() for line in file]
 
-    file_format_err_msgs = check_file_format(lines)
-
-    if file_format_err_msgs:
+    if file_format_err_msgs := check_file_format(lines):
         for err_msg in file_format_err_msgs:
             print(err_msg)
         sys.exit(1)
